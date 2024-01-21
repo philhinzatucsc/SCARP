@@ -26,12 +26,12 @@ L_0 = 30                    #outer scale of layers
 num_act = 2000
 #num_actuators = [200,500,1000,2000,4000]
 #num_pix = 1001             #number of pixels on a side in images. Odd, so we have a central pixel.  Is this really necessary??  One reason to keep it this way is the Bessel function fix 
-#num_pix = 51                #good for 1 um and longer
+num_pix = 21                #good for 1 um and longer
 #num_pix = 101               # good for 0.7 um and longer
-num_pix = 251               # good for 0.32 um and longer
+#num_pix = 251               # good for 0.32 um and longer
 
 #Write Column Headers to File
-output_file_name = 'PerfvsWavelength.txt'
+output_file_name = 'data/PerfvsWavelength.txt'
 file = open(output_file_name,'w')
 file.write("nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators openFWHM, avFWHM, stdFWHM, maxFWHM, minFWHM \n")
 file.close()
