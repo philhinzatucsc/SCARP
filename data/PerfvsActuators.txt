@@ -7,11 +7,6 @@ nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gs
 251, 9.00, 81, 1, 1,  30.00, 60.00, 0.320, 6, 16.0, 99000, 200,  0.753, 0.633, 0.003, 0.636, 0.627 
 251, 9.00, 81, 1, 1,  30.00, 60.00, 0.320, 6, 16.0, 99000, 1000,  0.753, 0.552, 0.003, 0.556, 0.544 
 251, 9.00, 81, 1, 1,  30.00, 60.00, 0.320, 6, 16.0, 99000, 3000,  0.753, 0.482, 0.004, 0.487, 0.470 
-nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators openFWHM, avFWHM, stdFWHM, maxFWHM, minFWHM 
-nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators openFWHM, avFWHM, stdFWHM, maxFWHM, minFWHM 
-nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators openFWHM, avFWHM, stdFWHM, maxFWHM, minFWHM 
-nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators openFWHM, avFWHM, stdFWHM, maxFWHM, minFWHM 
-nn, field_size, field_points, lp, hp ,L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators openFWHM, avFWHM, stdFWHM, maxFWHM, minFWHM 
 251, 9.00, 81, 1, 1,  30.00, 60.00, 0.800, 6, 16.0, 99000, 3000,  0.573, 0.276, 0.006, 0.284, 0.262 
 251, 9.00, 81, 1, 1,  30.00, 60.00, 0.800, 6, 16.0, 99000, 2000,  0.573, 0.276, 0.006, 0.283, 0.261 
 251, 9.00, 81, 1, 1,  30.00, 60.00, 0.800, 6, 16.0, 99000, 1000,  0.573, 0.286, 0.006, 0.294, 0.270 
