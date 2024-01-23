@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import utils as U
 import otps as O
 from scipy.special import jv
@@ -260,8 +261,11 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
     #print("pixels = {:d} wavel = {:6.2f} num stars = {:d}".format(nn, wavel*1E6,num_guide_stars))
     #print("av = {:6.3f} std = {:6.3f} max = {:6.3f} min = {:6.3f}".format(FWHM_av,FWHM_std,FWHM_max,FWHM_min))
     PSF_grid = PSF_vector.reshape((gridside,gridside))
-    #plt.imshow(PSF_grid * 1000, cmap = 'viridis_r')# vmin = 200, vmax = 500)
-    #plt.colorbar(label = 'FWHM (mas)')
+    fr = field_size /2 
+    plt.imshow(PSF_grid * 1000, cmap = 'viridis_r', vmin = 200, vmax = 500, extent =[-fr,fr,-fr,fr])
+    plt.colorbar(label = 'FWHM (mas)')
+    filename = 'maps/{:.2f}um-{:.0f}arcmin.png'.format(wavel*1E6,gsdiam)
+    plt.savefig(filename)
     #plt.show() 
 
     print("{:d}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}"  
