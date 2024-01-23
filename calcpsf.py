@@ -118,16 +118,7 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
         else :
             J_layer = O.Jhigh[(layer - len(O.lowlayers)),hp] / np.cos(ZA_rad)
             h = O.highlayers[layer - len(O.lowlayers)]
-        #print('J_layer {:d} is {:6.4e} m^(1/3) at a height {:6.0f} m'.format(layer, J_layer,h))
-        #Calculate Aperture scaling and shift for each guide star
-        #Not sure I actually use it in this form
-        #h = 1                                   #Height of this particular layer
-        #scale = h/H
-        #shift_x = alpha_rad * h
-        #shift_y = beta_rad * h 
-        #layer_X = Xap * scale  + shift_x
-        #layer_Y = Yap * scale + shift_y
-
+ 
 
         #******Set up Spatial filter in frequency domain ( |G(f)^2| )
         gamma = 1 - (h/H)           #scale if GS not at infinity
@@ -210,18 +201,7 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
         D_total_s = D_s + D_total_s
         for fp in range (field_points) :
             D_total_e[fp,:,:] = D_e[fp,:,:] + D_total_e[fp,:,:]
-        '''
-        #DEBUG: Take a look at the Structure functions to check whether they look right
-        plt.subplot(221)
-        plt.imshow(f_X)
-        plt.subplot(222)
-        plt.imshow(f_Y)
-        plt.subplot(223)
-        plt.imshow(D_e)
-        plt.subplot(224)
-        plt.imshow(D_s)
-        plt.show()
-        '''
+
 
     #Original and residual OTF's
     OTF = OTF_diff * np.exp(-D_total_s / 2)         #eq. 1
@@ -262,7 +242,7 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
     #print("av = {:6.3f} std = {:6.3f} max = {:6.3f} min = {:6.3f}".format(FWHM_av,FWHM_std,FWHM_max,FWHM_min))
     PSF_grid = PSF_vector.reshape((gridside,gridside))
     fr = field_size /2 
-    plt.imshow(PSF_grid * 1000, cmap = 'viridis_r', vmin = 200, vmax = 500, extent =[-fr,fr,-fr,fr])
+    plt.imshow(PSF_grid * 1000, cmap = 'viridis_r', extent =[-fr,fr,-fr,fr])
     plt.colorbar(label = 'FWHM (mas)')
     filename = 'maps/{:.2f}um-{:.0f}arcmin.png'.format(wavel*1E6,gsdiam)
     plt.savefig(filename)
