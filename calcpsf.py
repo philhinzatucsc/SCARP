@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import utils as U
 import otps as O
 from scipy.special import jv
+from astropy.io import fits
 
 
 def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators, outname) :
@@ -209,13 +210,25 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
     for fp in range(field_points) :
         OTF_e[fp,:,:] = OTF_diff * np.exp(-D_total_e[fp,:,:] / 2)
         PSF_e[fp,:,:] = U.normFT(OTF_e[fp,:,:])
-    '''
-    plt.subplot(121)
-    plt.imshow(PSF)
-    plt.subplot(122)
-    plt.imshow(PSF_e)
-    plt.show()
-    '''
+
+    ############ Create FITS file
+    hdr = fits.Header()
+    hdr['COMMENT'] = "Test file"
+    hdr['FIELDSZE'] = field_size
+    hdr['FIELDPTS'] = field_points
+    hdr['LOW_PERC'] = lp
+    hdr['HI_PERC'] = hp
+    hdr['L_0'] = L_0
+    hdr['ELEV'] = elevation
+    hdr['WAVEL'] = wavel*1E6
+    hdr['N_GS'] = num_guide_stars
+    hdr['GS_DIAM'] = gsdiam
+    hdr['H_GS'] = H
+    hdr['NUM_ACT'] = numactuators
+    fitsoutname = filename = 'fits/{:.2f}um-{:.0f}arcmin-{:.0f}km-{:d}_GS-{:d}_act.fits'.format(wavel*1E6,gsdiam,H,num_guide_stars,numactuators)
+    hdu = fits.PrimaryHDU(PSF_e,header=hdr)
+    hdu.writeto(fitsoutname, overwrite=True)
+
 
     open_fwhm_pixels,open_alpha = U.fitMoffat(PSF)
     open_fwhm_arcsec = open_fwhm_pixels * arcsec_pixel
@@ -244,8 +257,10 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
     fr = field_size /2 
     plt.imshow(PSF_grid * 1000, cmap = 'viridis_r', extent =[-fr,fr,-fr,fr])
     plt.colorbar(label = 'FWHM (mas)')
-    filename = 'maps/{:.2f}um-{:.0f}arcmin.png'.format(wavel*1E6,gsdiam)
-    plt.savefig(filename)
+    mapoutname = filename = 'maps/{:.2f}um-{:.0f}arcmin-{:.0f}km-{:d}_GS-{:d}_act.png'.format(wavel*1E6,gsdiam,H,num_guide_stars,numactuators)
+    hdu = fits.PrimaryHDU(PSF_e,header=hdr)
+    #filename = 'maps/{:.2f}um-{:.0f}arcmin.png'.format(wavel*1E6,gsdiam)
+    plt.savefig(mapoutname)
     #plt.show() 
 
     print("{:d}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}"  
