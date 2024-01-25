@@ -45,7 +45,10 @@ num_cores = 3       #set for macbook to avoid running out of memory
 
 if __name__ == "__main__":
     #results = Parallel(n_jobs=num_cores)(delayed(C.CalcPSF)(num_pix, field_size, num_field_points, low_perc, hi_perc, L_0, elev, wavel, num_gs, gs_diam, h_gs, num_act,output_file_name) for num_act in num_actuators)
-    results = Parallel(n_jobs=num_cores)(delayed(C.CalcPSF)(num_pix, field_size, num_field_points, low_perc, hi_perc, L_0, elev, wavel, num_gs, gs_diam, h_gs, num_act,output_file_name) for wavel in wavels)     
+    results = Parallel(n_jobs=num_cores)(delayed(C.CalcPSF)(num_pix, field_size, num_field_points, low_perc, hi_perc, L_0, elev, wavel, num_gs, gs_diam, h_gs, num_act,output_file_name) for wavel in wavels)
+    results = Parallel(n_jobs=num_cores)(delayed(C.CalcPSF)(num_pix, field_size*2, num_field_points, low_perc, hi_perc, L_0, elev, wavel, num_gs, gs_diam*2, h_gs, num_act,output_file_name) for wavel in wavels)
+    results = Parallel(n_jobs=num_cores)(delayed(C.CalcPSF)(num_pix, field_size*4, num_field_points, low_perc, hi_perc, L_0, elev, wavel, num_gs, gs_diam*4, h_gs, num_act,output_file_name) for wavel in wavels) 
+    results = Parallel(n_jobs=num_cores)(delayed(C.CalcPSF)(num_pix, field_size*4, num_field_points, low_perc, hi_perc, L_0, elev, wavel, num_gs, gs_diam*8, h_gs, num_act,output_file_name) for wavel in wavels)         
     
 
 

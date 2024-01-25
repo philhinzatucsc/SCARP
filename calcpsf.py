@@ -234,10 +234,12 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
     open_fwhm_arcsec = open_fwhm_pixels * arcsec_pixel
     
     PSF_vector = np.zeros(field_points)
+    alpha_vector = np.zeros(field_points)
     for fp in range(field_points) :
         corrected_fwhm_pixels, corrected_alpha = U.fitMoffat(PSF_e[fp,:,:])
         corrected_fwhm_arcsec = corrected_fwhm_pixels * arcsec_pixel
         PSF_vector[fp] = corrected_fwhm_arcsec 
+        alpha_vector[fp] = corrected_alpha
         '''
         print(" ")
         print("--------------------------------------------------")
@@ -251,6 +253,10 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
     FWHM_std = np.std(PSF_vector)
     FWHM_max = np.max(PSF_vector)
     FWHM_min = np.min(PSF_vector)
+    a_av = np.average(alpha_vector)
+    a_std = np.std(alpha_vector)
+    a_max = np.max(alpha_vector)
+    a_min = np.min(alpha_vector)
     #print("pixels = {:d} wavel = {:6.2f} num stars = {:d}".format(nn, wavel*1E6,num_guide_stars))
     #print("av = {:6.3f} std = {:6.3f} max = {:6.3f} min = {:6.3f}".format(FWHM_av,FWHM_std,FWHM_max,FWHM_min))
     PSF_grid = PSF_vector.reshape((gridside,gridside))
@@ -268,8 +274,9 @@ def CalcPSF(nn, field_size, field_points, lp, hp, L_0, elevation, wavel, num_gui
                   open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min))
     
     file = open(outname,'a')
-    file.write("{:d}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f} \n"  
+    file.write("{:d}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f} \n"  
           .format(nn,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
-                  open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min))
+                  open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min,
+                  open_alpha, a_av, a_std, a_max,a_min,))
     file.close()
     return nn,field_size,field_points, lp,hp,L_0,elevation, wavel,num_guide_stars,gsdiam,H,numactuators, open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min
