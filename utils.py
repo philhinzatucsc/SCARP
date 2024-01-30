@@ -49,3 +49,28 @@ def fitMoffat(PSF) :
     fitted_model = fitter(PSFmodel,X,Y,PSF)
     return fitted_model.fwhm, fitted_model.alpha.value
 
+def calc_ensq_e(PSF,threshold) :
+    """
+    estimate size of EE50 square from PSF image
+    threshold is the fractional energy
+    Returns EnsqE50 size
+    """
+    (imside1,imside2) =np.shape(PSF)
+    x = np.arange(imside1)
+    y = np.arange(imside2) 
+    X, Y = np.meshgrid(x, y)
+    sumflux = np.sum(PSF)
+    calcee50 = True
+    centerpix = int (imside1 / 2)
+    while (calcee50 == True) :
+        for i in range (centerpix) :
+            boxsum = np.sum(PSF[centerpix - i:centerpix+i,centerpix - i:centerpix+i])
+
+            frac = boxsum / sumflux 
+            if (frac  > threshold) and (calcee50 ==True) :
+                Ensq_size = i * 2
+                calcee50 = False
+            #if i == centerpix - 1 :
+            #    Ensq_size = 1E6
+            #    calcee50 = False
+    return Ensq_size
