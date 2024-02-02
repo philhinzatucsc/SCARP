@@ -77,7 +77,7 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     tempf_x = np.arange(n_ang) + 1
     tempf_y = np.arange(n_ang) + 1
     f_x = (tempf_x - ang_cen - 1) * lengthperfreqpix   #units of m^-1
-    f_y = (tempf_y - ang_cen - 1) * lengthperfreqpix    #units of m^-1          Put in factor of 2 on Jan. 30 after doing structure function checks 
+    f_y = (tempf_y - ang_cen - 1) * lengthperfreqpix    #units of m^-1          
     f_X, f_Y = np.meshgrid(f_x, f_y)
     f_r = np.sqrt((f_X)**2 + (f_Y)**2)
     max_f = np.max(f_r) / np.sqrt(2)
@@ -108,7 +108,6 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     diff_fwhm_arcsec = diff_fwhm_pixels * arcsec_pixel
     print ("Diff FWHM = {:6.2f} pixels, FWHM = {:6.4f} arcsec., Diff. alpha = {:6.2f}".format(diff_fwhm_pixels,diff_fwhm_arcsec,diff_alpha))
 
-    #setting range 1->2 is only median vaue
     D_total_s = np.zeros((n_struct,n_struct))                       #Total Atmosphere structure Function
     D_total_e = np.zeros((field_points,n_struct,n_struct))          #Total Residual Atmosphere Structure Function
 
@@ -172,33 +171,17 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
         dot_product = np.zeros((n_struct,n_struct,n_ang,n_ang))
         dfx = f_x[1] - f_x[0]           #steps in spatial frequency
         dfy = f_y[1] - f_y[0]           #steps in spatial frequency
-
+        #terms outside integral for eq. 7 and eq. 6
+        factor =  6.88 / 2   *  0.0229 * 0.423 * (2 * np.pi / wavel)**2 * J_layer   
         integrand2 = ((f_X**2 + f_Y**2) + (1/L_0**2))**(-11/6)          #second term in eq. 7
         if (Calc_GLAO_correction == True) :
             for fp in range(field_points) :
                 integrand2_e[fp,:,:] = ((f_X**2 + f_Y**2) + (1/L_0**2))**(-11/6)  * G2[fp,:,:]  #second term in eq. 7
-        
-        factor =  6.88 / 2   *  0.0229 * 0.423 * (2 * np.pi / wavel)**2 * J_layer      #terms outside integral for eq. 7 and eq. 6
-       
-        '''
-        #Attempt to speed up computations in nested for loops
-        outer1 = np.einsum('i,j->ij',f_X.ravel(),Xap.ravel())      #generalization of np.outer for 2D matrices
-        dot_product1 = outer1.reshape((nn,nn,nn,nn))
-        outer2 = np.einsum('i,j->ij',f_Y.ravel(),Yap.ravel())      #generalization of np.outer for 2D matrices
-        dot_product2 = outer2.reshape((nn,nn,nn,nn))
-
-        dot_product = dot_product1 + dot_product2
-        '''
-
-        #+ np.outer(f_Y,Yap) 
-        #print(np.shape(f_X), np.shape(Xap), np.shape(dot_product))
-
         for i in range (n_struct) :                           #populate structure functions
             #if (i % 10 == 0) :
             #    print(layer,i,j)           
             for j in range (n_struct) :
                 dot_product[i,j,:,:] = f_X * X_struct[i,j] + f_Y * Y_struct[i,j]       
-
                 integrand1 = dfx * dfy * (1 - np.cos(2 * np.pi * dot_product[i,j,:,:])) 
                 integrand = integrand1 * integrand2
                 integral =np.sum(integrand)
@@ -208,8 +191,6 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
                         integrand_e[fp,:,:] = integrand1 * integrand2_e[fp,:,:]
                         integral_e =np.sum(integrand_e[fp,:,:])
                         D_e[fp,i,j] = factor * integral_e
-
-
         D_total_s = D_s + D_total_s
         if (Calc_GLAO_correction == True) :
             for fp in range (field_points) :
