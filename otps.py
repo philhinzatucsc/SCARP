@@ -10,6 +10,8 @@ Optical Turbulence Profiles for Mauna Kea
 
 # Define Optical Turbulence Profile
 #Chun model
+#factor_chun = 3                                    #factor added to match open loop images at 0.5 um
+factor_chun = 1
 lowlayers = [ 1,15,30,45,60,75,90,105,120,160,240,320,400,480,560]
 Jlowcoeff = np.array([[48.6, 115., 167.],
                 [53.0, 45.1, 79.9],
@@ -39,13 +41,15 @@ Jhighcoeff = np.array([[6.72 , 10.1, 15.5],
                 [9.43 , 14.8, 15.7],
                 [3.20 , 3.08, 3.87],
                 [2.64 , 3.89, 6.75]])
-Jlow = 1 * Jlowcoeff *10**-15
-Jhigh = 1 * Jhighcoeff *10**-15
+Jlow = 1 * Jlowcoeff *10**-15 * factor_chun
+Jhigh = 1 * Jhighcoeff *10**-15 * factor_chun
 #numlayers = len(lowlayers)+len(highlayers)
 
 #Dekany model
+factor_dekany = 2 * 0.86      #0.86 added to agree with median r_0 at 0.5 um
+factor_dekany = 1
 lambda_ref = 0.5E-6
-coeff = (lambda_ref / np.pi)**2
+coeff = (lambda_ref /  2 / np.pi)**2 / 0.423
 layers_dekany = [ 1,15,30,45,120,200,280,360,440,807,4349,8000,12000,19501]
 J_dekany = np.array([
                 [0.351,0.431,0.482,0.291,0.302,0.449,0.237,0.334,0.412],
@@ -64,8 +68,9 @@ J_dekany = np.array([
                 [0.029,0.018,0.010,0.038,0.036,0.015,0.045,0.031,0.020]])
 r_0 = [0.122,0.137,0.147,0.143,0.168,0.186,0.162,0.198,0.226]
 #print(np.size(J_dekany))
+#print(np.sum(J_dekany[:,3]))
 rows,columns = np.shape(J_dekany)
 for col in range(columns) :
 
-    J_dekany[:,col] = coeff * J_dekany[:,col] / (r_0[col] **(5/3))
+    J_dekany[:,col] = coeff * J_dekany[:,col] / (r_0[col] **(5/3)) * factor_dekany
 #numlayers = len(layers)

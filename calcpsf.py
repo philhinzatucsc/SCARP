@@ -4,105 +4,89 @@ import utils as U
 import otps as O
 from scipy.special import jv
 from astropy.io import fits
+from scipy.interpolate import griddata
 
 
 def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_stars, gsdiam, H, numactuators, outname) :
     '''
     Top level function to execute a calculation
     '''
-    
-    '''
-    nn = inputs[0]
-    field_size = inputs[1]
-    field_points = inputs[2]
-    lp = inputs[3]
-    hp = inputs[4]
-    L_0 = inputs[5]
-    elevation = inputs[6]
-    wavel = inputs[7]
-    num_guide_stars = inputs[8]
-    gsdiam = inputs[9]
-    H = inputs[10]
-    numactuators = inputs[11]
-    '''
 
-    #Setup spatial sampling and angular scales based on wavelength
-    if (wavel >1.01E-6) :
-        nn = 201
-        #nn = 51                     #code testing
-        pad_size = 3                            #pad_size = 2 makes aperture half the size of array. 
-                                                #  ->  image pixels are wavel / D / pad size
-    elif (wavel>0.601E-6) :
-        nn = 251    
-        #nn = 51                     #code testing
-        pad_size = 2
-    else :
-        nn = 251
-        #nn = 51                     #code testing
-        pad_size = 1
+    #Setup spatial sampling and angular scales
+    n_pos = 251
+    pos_cen = (n_pos+1)/2
+    n_ang = 251
+    ang_cen = (n_ang+1)/2
+    pad_size = 1
+    n_struct = 21
+    struct_cen = (n_struct+1)/2
 
-
-    print ('number of resolution elements = {:d}, pad size = {:0.1f}, wavel = {:.3f} um'.format(nn,pad_size,wavel*1E6))
-
+    print ('number of resolution elements = {:d}, pad size = {:0.1f}, wavel = {:.3f} um'.format(n_pos,pad_size,wavel*1E6))
 
     #Setup Guide star asterism
     theta_0 = gsdiam/2                #set science field as guide star size
     ZA = 90 - elevation             #Zenith Angle
     ZA_rad = ZA * np.pi / 180.0
 
-    #lowpercentile = 0
-    #hipercentile = 2
-
-
 
     gridside = int(np.sqrt(field_points))
-    #alpha_fp_arcmin = field_size  * np.array([1,0,-1,0,0])
-    #beta_fp_arcmin = field_size  * np.array([0,1,0,-1,0])
                 
 
-
-    dim = [nn, nn]
-    pos = [(nn+1)/2,(nn+1)/2]
     diam_m = 10.0
     radius_m = diam_m / 2.0
     
-    lengthperpix = diam_m * pad_size / nn     
+    lengthperpix = diam_m * pad_size / n_pos     
     radius = radius_m/lengthperpix
     rhole = radius*0/6.35
     #Calculate diffraction-limited values for OTF and PSF
-    x = np.arange(dim[1]) + 1
-    y = np.arange(dim[0]) + 1
+    x = np.arange(n_pos) + 1
+    y = np.arange(n_pos) + 1
     X, Y = np.meshgrid(x, y)            
-    Xap = (X - pos[0]) * lengthperpix
-    Yap = (Y - pos[1]) * lengthperpix
+    Xap = (X - pos_cen) * lengthperpix
+    Yap = (Y - pos_cen) * lengthperpix
     Rap = np.sqrt( Xap**2 + Yap**2 )
     Tel_App = (Rap <= radius_m).astype(int)
+
+    #plt.imshow(Tel_App)
+    #plt.show()
 
     dact = 2 * radius_m / np.sqrt(numactuators)
     #print ("Actuator Spacing = {:6.4f} m".format(dact))
 
-    G2 = np.zeros((field_points,nn,nn))
-    D_total_s = np.zeros((nn,nn))                       #Atmosphere structure Function
-    D_total_e = np.zeros((field_points,nn,nn))          #Residual Atmosphere Structure Function
-    OTF_e = np.zeros((field_points,nn,nn))              #Residual OTF
-    PSF_e = np.zeros((field_points,nn,nn))              #Residual PSF
-    PSF_fits = np.zeros((field_points+1,nn,nn))         #PSF cube for FITS
+    G2 = np.zeros((field_points,n_ang,n_ang))
+    D_total_s = np.zeros((n_struct,n_struct))                       #Atmosphere structure Function
+    D_total_e = np.zeros((field_points,n_struct,n_struct))          #Residual Atmosphere Structure Function
+    OTF_e = np.zeros((field_points,n_pos,n_pos))              #Residual OTF
+    PSF_e = np.zeros((field_points,n_pos,n_pos))              #Residual PSF
+    PSF_fits = np.zeros((field_points+2,n_pos,n_pos))         #PSF cube for FITS , field points + open loop and diffraction
 
-    #Optical Transfer Function coordinates
-    k_x = (x - pos[0] - 1) * lengthperpix    #units of m (Tok. uses 1/radians)
-    k_y = (y - pos[0] - 1) * lengthperpix    #units of m  (variable k in Tok. 2004)
-    k_X, k_Y = np.meshgrid(k_x, k_y)
-    k_r = np.sqrt((k_X)**2 + (k_Y)**2)
+    #Structure Functions coordinates
+    max_struct_value = 1            #Not sure how to set this.  I think above 2 we don't care??
+    lengthperstructpix = 1 / n_struct * max_struct_value * 2
+    x_s = np.arange(n_struct) + 1
+    y_s = np.arange(n_struct) + 1
+    X_s, Y_s = np.meshgrid(x_s, y_s)            
+    X_struct = (X_s - struct_cen) * lengthperstructpix
+    Y_struct = (Y_s - struct_cen) * lengthperstructpix
+
+    R_struct = np.sqrt(X_struct**2 + Y_struct**2)
 
     #Spatial Frequency coordinates
-    f_x = (x - pos[0] - 1) / lengthperpix / nn   #units of m^-1
-    f_y = (y - pos[0] - 1) / lengthperpix / nn   #units of m^-1 
+    max_freq_value = 2            #Not sure how to set this.  I think above 2 we don't care??
+    lengthperfreqpix = 1 / n_ang * max_freq_value * 2
+    f_x = (x - ang_cen - 1) * lengthperfreqpix   #units of m^-1
+    f_y = (y - ang_cen - 1) * lengthperfreqpix    #units of m^-1          Put in factor of 2 on Jan. 30 after doing structure function checks 
     f_X, f_Y = np.meshgrid(f_x, f_y)
     f_r = np.sqrt((f_X)**2 + (f_Y)**2)
+    max_f = np.max(f_r) / np.sqrt(2)
+    print('Maximum frequency along one axis is {:.2f}'.format(max_f))
 
     #DM spatial filter
     fcutoff = 1/2/dact
     R = f_r < fcutoff
+
+    #plt.imshow(R)
+    #plt.show()
 
     ns = np.arange(num_guide_stars)
     ns_angle = ns /num_guide_stars * 2 * np.pi
@@ -114,88 +98,86 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     beta = beta_arcmin * arcminutes_to_radians
     weight = 1/ num_guide_stars * np.ones(num_guide_stars)      #equally weight all guide stars
 
-    arcsec_pixel = wavel /pad_size /  (diam_m ) * 206265              
+    arcsec_pixel = wavel / pad_size /  (diam_m ) * 206265              
     print(" spatial sampling is {:6.3f} m.  arcsec/pixel is {:6.4f}".format(lengthperpix,arcsec_pixel))
     #Create PSF and OTF from aperture
     PSF_diff,OTF_diff = U.AptoI(Tel_App)     #I= normalized  diff. PSF,  OTF_diff= diffraction limited OTF before normalization
     diff_fwhm_pixels,diff_alpha = U.fitMoffat(PSF_diff)
     diff_fwhm_arcsec = diff_fwhm_pixels * arcsec_pixel
-    #print ("Diff FWHM = {:6.2f} pixels, FWHM = {:6.4f} arcsec., Diff. alpha = {:6.2f}".format(diff_fwhm_pixels,diff_fwhm_arcsec,diff_alpha))
+    print ("Diff FWHM = {:6.2f} pixels, FWHM = {:6.4f} arcsec., Diff. alpha = {:6.2f}".format(diff_fwhm_pixels,diff_fwhm_arcsec,diff_alpha))
 
     #setting range 1->2 is only median vaue
-    D_total_s = np.zeros((nn,nn))                       #Atmosphere structure Function
-    D_total_e = np.zeros((field_points,nn,nn))          #Residual Atmosphere Structure Function
+    D_total_s = np.zeros((n_struct,n_struct))                       #Total Atmosphere structure Function
+    D_total_e = np.zeros((field_points,n_struct,n_struct))          #Total Residual Atmosphere Structure Function
 
-    '''   Chun model 
-    num_layers = len(O.lowlayers) + len(O.highlayers)
-    fudge_factor = 3                                    #factor added to match open loop images at 0.5 um
+    '''   Chun model '''
+    num_layers = len(O.lowlayers) + len(O.highlayers) 
     for layer in range (num_layers) : 
-        #print("Atmospheric layer {:d}".format(layer))
+        print("Atmospheric layer {:d}".format(layer))
         if layer < len(O.lowlayers) :
-            J_layer = O.Jlow[layer,lp] / np.cos(ZA_rad)  * fudge_factor
+            J_layer = O.Jlow[layer,lp] / np.cos(ZA_rad) 
             h = O.lowlayers[layer] / np.cos(ZA_rad)
         else :
-            J_layer = O.Jhigh[(layer - len(O.lowlayers)),hp] / np.cos(ZA_rad) * fudge_factor 
+            J_layer = O.Jhigh[(layer - len(O.lowlayers)),hp] / np.cos(ZA_rad) 
             h = (O.highlayers[layer - len(O.lowlayers)] ) / np.cos(ZA_rad)
-    '''
-    ''' Dekany model ''' 
+        #'''
+            
+        ''' Dekany model  
     num_layers = len(O.layers_dekany)
-    fudge_factor_dekany = 2 * 0.86      #0.86 added to agree with median r_0 at 0.5 um
     column = (2-hp) + (2-lp)*3
     for layer in range (num_layers) :
         print("Atmospheric layer {:d}".format(layer))
-        J_layer = O.J_dekany[layer,column] / np.cos(ZA_rad) * fudge_factor_dekany
+        J_layer = O.J_dekany[layer,column] / np.cos(ZA_rad)
         h =  O.layers_dekany[layer] / np.cos(ZA_rad)
+        '''
+
+        Calc_GLAO_correction = False
     
-        #******Set up Spatial filter in frequency domain ( |G(f)^2| )
-        gamma = 1 - (h/H)           #scale if GS not at infinity
-        A = 2 * jv(1,np.pi * f_r * radius_m*2  * h / H) / (np.pi * f_r * radius_m*2 * h / H )   #jv(1,..) - first order Bessel Function. eq. A6
-        A[int((nn+1)/2),int((nn+1)/2)] = 1          #replace center pixel  (why is this needed?)
+        if (Calc_GLAO_correction == True) :
+            #******Set up Spatial filter in frequency domain ( |G(f)^2| )
+            gamma = 1 - (h/H)           #scale if GS not at infinity
+            A = 2 * jv(1,np.pi * f_r * radius_m*2  * h / H) / (np.pi * f_r * radius_m*2 * h / H )   #jv(1,..) - first order Bessel Function. eq. A6
+            A[int((n_ang+1)/2),int((n_ang+1)/2)] = 1          #replace center pixel  (why is this needed?)
 
-        field = np.zeros(field_points)
-        for field_point in range(field_points) :
-            sum_over_guide_stars = 0
-            ii = np.mod(field_point, gridside)
-            jj = np.floor_divide(field_point,gridside)
+            field = np.zeros(field_points)
+            for field_point in range(field_points) :
+                sum_over_guide_stars = 0
+                ii = np.mod(field_point, gridside)
+                jj = np.floor_divide(field_point,gridside)
+                
+                cent = np.floor(gridside/2)
+                alpha_fp_arcmin = (ii - cent) / cent * field_size / 2
+                beta_fp_arcmin = (jj - cent) / cent * field_size / 2 
+                alpha_fp = alpha_fp_arcmin * arcminutes_to_radians 
+                beta_fp = beta_fp_arcmin * arcminutes_to_radians 
+                for i in range (num_guide_stars) :
+                    dot_product = (f_X * (alpha[i] - alpha_fp)) + (f_Y * (beta[i]-beta_fp))
+                    #print(np.shape(dot_product))                                #_fp sets the field dependence
+                    sum_over_guide_stars += weight[i] * np.cos (2 * np.pi * h * dot_product )
+                doublesum_over_guide_stars = 0
+                for i in range (num_guide_stars) :
+                    for j in range (num_guide_stars) :
+                        dot_product2 = f_X * (alpha[i]-alpha[j]) + f_Y * (beta[i] - beta[j])
+                        doublesum_over_guide_stars += weight[i] * weight[j] * np.cos (2 * np.pi * h * dot_product2 )
+                G2[field_point,:,:] = 1 - (2 * gamma  * R  * A * sum_over_guide_stars) + (gamma**2 * R**2 * doublesum_over_guide_stars)            #eq. A18 
             
-            cent = np.floor(gridside/2)
-            alpha_fp_arcmin = (ii - cent) / cent * field_size / 2
-            beta_fp_arcmin = (jj - cent) / cent * field_size / 2 
-            alpha_fp = alpha_fp_arcmin * arcminutes_to_radians 
-            beta_fp = beta_fp_arcmin * arcminutes_to_radians 
-            for i in range (num_guide_stars) :
-                dot_product = (f_X * (alpha[i] - alpha_fp)) + (f_Y * (beta[i]-beta_fp))
-                #print(np.shape(dot_product))                                #_fp sets the field dependence
-                sum_over_guide_stars += weight[i] * np.cos (2 * np.pi * h * dot_product )
-            doublesum_over_guide_stars = 0
-            for i in range (num_guide_stars) :
-                for j in range (num_guide_stars) :
-                    dot_product2 = f_X * (alpha[i]-alpha[j]) + f_Y * (beta[i] - beta[j])
-                    doublesum_over_guide_stars += weight[i] * weight[j] * np.cos (2 * np.pi * h * dot_product2 )
-            G2[field_point,:,:] = 1 - (2 * gamma  * R  * A * sum_over_guide_stars) + (gamma**2 * R**2 * doublesum_over_guide_stars)            #eq. A18 
-        
-        field_grid = field.reshape((gridside,gridside))
-        #plt.imshow(field_grid)
-        #plt.show()
-        #r_0 = 0.15 
-
-        #J_layer =  (wavel/ 2 /np.pi)**2 / 0.423 / (r_0/2) ** (5/3)           #definition after eq. 4.   Stray factor of two is included to match r_0 input
-
 
         ###########Construct Structure functions
-        D_s = np.zeros((nn,nn))         #Atmosphere structure Function
-        D_e = np.zeros((field_points,nn,nn))         #Residual Atmosphere Structure Function
-        integrand2_e = np.zeros((field_points,nn,nn))   
-        integrand_e = np.zeros((field_points,nn,nn))        
-        dot_product = np.zeros((nn,nn,nn,nn))
+        D_s = np.zeros((n_struct,n_struct))                         #per layer Atmosphere structure Function
+        D_e = np.zeros((field_points,n_struct,n_struct))            #per layer Residual Atmosphere Structure Function
+        integrand2_e = np.zeros((field_points,n_struct,n_struct))   
+        integrand_e = np.zeros((field_points,n_struct,n_struct))        
+        dot_product = np.zeros((n_struct,n_struct,n_ang,n_ang))
         dfx = f_x[1] - f_x[0]           #steps in spatial frequency
         dfy = f_y[1] - f_y[0]           #steps in spatial frequency
 
         integrand2 = ((f_X**2 + f_Y**2) + (1/L_0**2))**(-11/6)          #second term in eq. 7
-        for fp in range(field_points) :
-            integrand2_e[fp,:,:] = ((f_X**2 + f_Y**2) + (1/L_0**2))**(-11/6)  * G2[fp,:,:]  #second term in eq. 7
-        factor = 0.0229 * 0.423 * (2 * np.pi / wavel)**2 * J_layer      #terms outside integral for eq. 7 and eq. 6
-        #factor = factor * 3                                             #fudge factor to fit stats at visible wavelength -removed and added to chun model        
+        if (Calc_GLAO_correction == True) :
+            for fp in range(field_points) :
+                integrand2_e[fp,:,:] = ((f_X**2 + f_Y**2) + (1/L_0**2))**(-11/6)  * G2[fp,:,:]  #second term in eq. 7
+        
+        factor =  6.88 / 2  *  0.0229 * 0.423 * (2 * np.pi / wavel)**2 * J_layer      #terms outside integral for eq. 7 and eq. 6
+       
         '''
         #Attempt to speed up computations in nested for loops
         outer1 = np.einsum('i,j->ij',f_X.ravel(),Xap.ravel())      #generalization of np.outer for 2D matrices
@@ -209,36 +191,89 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
         #+ np.outer(f_Y,Yap) 
         #print(np.shape(f_X), np.shape(Xap), np.shape(dot_product))
 
-        for i in range (nn) :                           #populate structure functions
+        for i in range (n_struct) :                           #populate structure functions
             #if (i % 10 == 0) :
             #    print(layer,i,j)           
-            for j in range (nn) :
-                dot_product[i,j,:,:] = f_X * Xap[i,j] + f_Y * Yap[i,j]       
+            for j in range (n_struct) :
+                dot_product[i,j,:,:] = f_X * X_struct[i,j] + f_Y * Y_struct[i,j]       
 
                 integrand1 = dfx * dfy * (1 - np.cos(2 * np.pi * dot_product[i,j,:,:])) 
                 integrand = integrand1 * integrand2
                 integral =np.sum(integrand)
                 D_s[i,j] = factor * integral
-                for fp in range (field_points) :
-                    integrand_e[fp,:,:] = integrand1 * integrand2_e[fp,:,:]
-                    integral_e =np.sum(integrand_e[fp,:,:])
-                    D_e[fp,i,j] = factor * integral_e
+                if (Calc_GLAO_correction == True) :
+                    for fp in range (field_points) :
+                        integrand_e[fp,:,:] = integrand1 * integrand2_e[fp,:,:]
+                        integral_e =np.sum(integrand_e[fp,:,:])
+                        D_e[fp,i,j] = factor * integral_e
 
 
         D_total_s = D_s + D_total_s
-        for fp in range (field_points) :
-            D_total_e[fp,:,:] = D_e[fp,:,:] + D_total_e[fp,:,:]
+        if (Calc_GLAO_correction == True) :
+            for fp in range (field_points) :
+                D_total_e[fp,:,:] = D_e[fp,:,:] + D_total_e[fp,:,:]
 
+    # Create a finer grid
+    finer_x = np.linspace(np.min(X_struct), np.max(X_struct), n_pos)
+    finer_y = np.linspace(np.min(X_struct), np.max(X_struct), n_pos)
+
+    # Create meshgrid for the finer grid
+    finer_x_mesh, finer_y_mesh = np.meshgrid(finer_x, finer_y)
+
+    # Flatten the original array and corresponding coordinates
+    points = np.column_stack((X_struct.flatten(), Y_struct.flatten()))
+    values = D_total_s.flatten()
+
+    # Interpolate onto the finer grid using scipy.interpolate.griddata
+    D_total_s_fine = griddata(points, values, (finer_x_mesh, finer_y_mesh), method='linear')
+
+
+    '''
+    plt.subplot(131)
+    plt.imshow(np.real(OTF_diff))
+    plt.subplot(132)
+    plt.imshow(D_total_s)
+    plt.subplot(133)
+    plt.imshow(D_total_s_fine)
+    plt.show()
+    '''
 
     #Original and residual OTF's
-    OTF = OTF_diff * np.exp(-D_total_s / 2)         #eq. 1
+    OTF = OTF_diff * np.exp(-D_total_s_fine / 2)         #eq. 1
     PSF = U.normFT(OTF)
-    for fp in range(field_points) :
-        OTF_e[fp,:,:] = OTF_diff * np.exp(-D_total_e[fp,:,:] / 2)
-        PSF_e[fp,:,:] = U.normFT(OTF_e[fp,:,:])
-        PSF_fits[fp,:,:] = PSF_e[fp,:,:]
-    PSF_fits[field_points,:,:] = PSF                #add open loop to end of cube for FITS
 
+    '''
+    PSF_compare = U.normFT(OTF_diff)
+    plt.subplot(121)
+    plt.imshow(PSF_diff)
+    plt.subplot(122)
+    plt.imshow(PSF_compare)
+    plt.show()
+    '''
+    rr = np.arange(n_pos) * lengthperpix
+    r_0 = 0.168
+    normfactor =   r_0**(5/3)
+    D_theory = 6.88 * (rr/r_0)**(5/3) 
+    plt.subplot(121)
+    plt.imshow(D_total_s)
+    plt.subplot(122)
+    plt.plot(R_struct,D_total_s,'.')
+    plt.plot(rr,D_theory)
+    plt.xlim((0,10))
+    plt.ylim((0,10000))
+    plt.show()
+
+    if (Calc_GLAO_correction == True) :
+        for fp in range(field_points) :
+            OTF_e[fp,:,:] = OTF_diff * np.exp(-D_total_e[fp,:,:] / 2)
+            PSF_e[fp,:,:] = U.normFT(OTF_e[fp,:,:])
+            PSF_fits[fp,:,:] = PSF_e[fp,:,:]
+        PSF_fits[field_points,:,:] = PSF                        #add open loop to end of cube for FITS
+        PSF_fits[field_points+1,:,:] = PSF_diff                 #add open loop to end of cube for FITS
+    else :
+        PSF_fits[field_points,:,:] = PSF                        #add open loop to end of cube for FITS
+        PSF_fits[field_points+1,:,:] = PSF_diff                 #add open loop to end of cube for FITS
+    
     ############ Create FITS file
     hdr = fits.Header()
     hdr['CDELT'] = arcsec_pixel
@@ -259,7 +294,7 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     hdu = fits.PrimaryHDU(PSF_fits,header=hdr)
     hdu.writeto(fitsoutname, overwrite=True)
 
- 
+    
 
     open_fwhm_pixels,open_alpha = U.fitMoffat(PSF)
     open_fwhm_arcsec = open_fwhm_pixels * arcsec_pixel
@@ -268,64 +303,75 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     open_EnsqE50_arcsec = open_EnsqE50_pixels * arcsec_pixel
     
     #print("Made it here")
-    PSF_vector = np.zeros(field_points)
-    alpha_vector = np.zeros(field_points)
-    EsqE50_vector = np.zeros(field_points)
-    for fp in range(field_points) :
-        corrected_fwhm_pixels, corrected_alpha = U.fitMoffat(PSF_e[fp,:,:])
-        corrected_fwhm_arcsec = corrected_fwhm_pixels * arcsec_pixel
-        PSF_vector[fp] = corrected_fwhm_arcsec 
-        alpha_vector[fp] = corrected_alpha
+    if (Calc_GLAO_correction == True) :
+        PSF_vector = np.zeros(field_points)
+        alpha_vector = np.zeros(field_points)
+        EsqE50_vector = np.zeros(field_points)
+        for fp in range(field_points) :
+            corrected_fwhm_pixels, corrected_alpha = U.fitMoffat(PSF_e[fp,:,:])
+            corrected_fwhm_arcsec = corrected_fwhm_pixels * arcsec_pixel
+            PSF_vector[fp] = corrected_fwhm_arcsec 
+            alpha_vector[fp] = corrected_alpha
 
-        corr_EnsqE50_pixels = U.calc_ensq_e(PSF_e[fp,:,:],0.5)
-        corr_EnsqE50_arcsec = corr_EnsqE50_pixels * arcsec_pixel
-        EsqE50_vector[fp] = corr_EnsqE50_arcsec
-        '''
-        print(" ")
-        print("--------------------------------------------------")
-        print(lp,hp,fp)
-        print("Guide star diameter = {:6.2f} arcminutes, wavel = {:6.2f} um".format(gsdiam, wavel*1E6))
-        print ("Original FWHM = {:6.2f}, Original alpha = {:6.2f}".format(open_fwhm_arcsec,open_alpha))
-        print ("Corrected FWHM = {:6.2f}, Corrected alpha = {:6.2f}".format(corrected_fwhm_arcsec,corrected_alpha))
-        print ("Original EnsqE50 = {:6.3f}, Corrected_ensq50 = {:6.2f}".format(open_EnsqE50_arcsec,corr_EnsqE50_arcsec))
-        print("--------------------------------------------------")
-        '''
+            corr_EnsqE50_pixels = U.calc_ensq_e(PSF_e[fp,:,:],0.5)
+            corr_EnsqE50_arcsec = corr_EnsqE50_pixels * arcsec_pixel
+            EsqE50_vector[fp] = corr_EnsqE50_arcsec
+            '''
+            print(" ")
+            print("--------------------------------------------------")
+            print(lp,hp,fp)
+            print("Guide star diameter = {:6.2f} arcminutes, wavel = {:6.2f} um".format(gsdiam, wavel*1E6))
+            print ("Original FWHM = {:6.2f}, Original alpha = {:6.2f}".format(open_fwhm_arcsec,open_alpha))
+            print ("Corrected FWHM = {:6.2f}, Corrected alpha = {:6.2f}".format(corrected_fwhm_arcsec,corrected_alpha))
+            print ("Original EnsqE50 = {:6.3f}, Corrected_ensq50 = {:6.2f}".format(open_EnsqE50_arcsec,corr_EnsqE50_arcsec))
+            print("--------------------------------------------------")
+            '''
         
-    FWHM_av = np.average(PSF_vector)
-    FWHM_std = np.std(PSF_vector)
-    FWHM_max = np.max(PSF_vector)
-    FWHM_min = np.min(PSF_vector)
-    a_av = np.average(alpha_vector)
-    a_std = np.std(alpha_vector)
-    a_max = np.max(alpha_vector)
-    a_min = np.min(alpha_vector)
-    EE50_av = np.average(EsqE50_vector)
-    EE50_std = np.std(EsqE50_vector)
-    EE50_max = np.max(EsqE50_vector)
-    EE50_min = np.min(EsqE50_vector)
+        FWHM_av = np.average(PSF_vector)
+        FWHM_std = np.std(PSF_vector)
+        FWHM_max = np.max(PSF_vector)
+        FWHM_min = np.min(PSF_vector)
+        a_av = np.average(alpha_vector)
+        a_std = np.std(alpha_vector)
+        a_max = np.max(alpha_vector)
+        a_min = np.min(alpha_vector)
+        EE50_av = np.average(EsqE50_vector)
+        EE50_std = np.std(EsqE50_vector)
+        EE50_max = np.max(EsqE50_vector)
+        EE50_min = np.min(EsqE50_vector)
 
-    #print("pixels = {:d} wavel = {:6.2f} num stars = {:d}".format(nn, wavel*1E6,num_guide_stars))
-    #print("av = {:6.3f} std = {:6.3f} max = {:6.3f} min = {:6.3f}".format(FWHM_av,FWHM_std,FWHM_max,FWHM_min))
-    PSF_grid = PSF_vector.reshape((gridside,gridside))
-    fr = field_size /2 
-    plt.figure(1,figsize=(12,12))
-    plt.imshow(PSF_grid * 1000, cmap = 'viridis_r', extent =[-fr,fr,-fr,fr])
-    plt.colorbar(label = 'FWHM (mas)')
-    mapoutname = filename = 'maps/{:.2f}um-{:.0f}arcmin-{:.0f}km-{:d}_GS-{:d}_act.png'.format(wavel*1E6,gsdiam,H,num_guide_stars,numactuators)
-    hdu = fits.PrimaryHDU(PSF_e,header=hdr)
-    #filename = 'maps/{:.2f}um-{:.0f}arcmin.png'.format(wavel*1E6,gsdiam)
-    plt.savefig(mapoutname)
-    #plt.show() 
+        #print("pixels = {:d} wavel = {:6.2f} num stars = {:d}".format(nn, wavel*1E6,num_guide_stars))
+        #print("av = {:6.3f} std = {:6.3f} max = {:6.3f} min = {:6.3f}".format(FWHM_av,FWHM_std,FWHM_max,FWHM_min))
+        PSF_grid = PSF_vector.reshape((gridside,gridside))
+        fr = field_size /2 
+        plt.figure(1,figsize=(12,12))
+        plt.imshow(PSF_grid * 1000, cmap = 'viridis_r', extent =[-fr,fr,-fr,fr])
+        plt.colorbar(label = 'FWHM (mas)')
+        mapoutname = filename = 'maps/{:.2f}um-{:.0f}arcmin-{:.0f}km-{:d}_GS-{:d}_act.png'.format(wavel*1E6,gsdiam,H,num_guide_stars,numactuators)
+        hdu = fits.PrimaryHDU(PSF_e,header=hdr)
+        #filename = 'maps/{:.2f}um-{:.0f}arcmin.png'.format(wavel*1E6,gsdiam)
+        plt.savefig(mapoutname)
+        #plt.show() 
 
-    print("{:d}, {:.1f}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}"  
-          .format(nn,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
-                  open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min))
-    
-    file = open(outname,'a')
-    file.write("{:d}, {:.1f}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}\n"  
-          .format(nn,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
-                  open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min,
-                  open_alpha, a_av, a_std, a_max,a_min,
-                 open_EnsqE50_arcsec, EE50_av, EE50_std, EE50_max,EE50_min ))
-    file.close()
-    return nn,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel,num_guide_stars,gsdiam,H,numactuators, open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min
+        print("{:d}, {:.1f}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}"  
+            .format(n_pos,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
+                    open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min))
+        
+        file = open(outname,'a')
+        file.write("{:d}, {:.1f}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f},  {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}\n"  
+            .format(n_pos,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
+                    open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min,
+                    open_alpha, a_av, a_std, a_max,a_min,
+                    open_EnsqE50_arcsec, EE50_av, EE50_std, EE50_max,EE50_min ))
+        file.close()
+        return n_pos,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel,num_guide_stars,gsdiam,H,numactuators, open_fwhm_arcsec, FWHM_av, FWHM_std, FWHM_max,FWHM_min
+    else :
+        print("{:d}, {:.1f}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}\n"  
+            .format(n_pos,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
+                    open_fwhm_arcsec ))
+        file = open(outname,'a')
+        file.write("{:d}, {:.1f}, {:.2f}, {:d}, {:d}, {:d},  {:.2f}, {:.2f}, {:.3f}, {:d}, {:.1f}, {:.0f}, {:d},  {:.3f}\n"  
+            .format(n_pos,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel*1E6,num_guide_stars,gsdiam,H,numactuators,
+                    open_fwhm_arcsec ))
+        return n_pos,pad_size,field_size,field_points, lp,hp,L_0,elevation, wavel,num_guide_stars,gsdiam,H,numactuators, open_fwhm_arcsec
+        
