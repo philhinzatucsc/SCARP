@@ -27,7 +27,7 @@ num_gs = 6                  #Number of guide stars
 low_perc = 1                #index for low layers percentile (0-2)  lower is better conditions
 hi_perc = 1                 #index for high layers percentile (0-2)  lower is better conditions
 L_0 = 30 * 1E6                   #outer scale of layers
-num_act = 2000
+num_act = 4000
 #num_actuators = [200,500,1000,2000, 3000,4000,5000,6000]
 num_actuators = [2000]
 

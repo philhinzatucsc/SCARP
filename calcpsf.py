@@ -13,9 +13,9 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     '''
 
     #Setup spatial sampling and angular scales
-    n_pos = 251
+    n_pos = 201                 #201 with pad=1 at 0.5 um is +/-1"
     pos_cen = (n_pos+1)/2
-    n_ang = 251
+    n_ang = 201
     ang_cen = (n_ang+1)/2
     pad_size = 1
     n_struct = 21
@@ -61,7 +61,7 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     PSF_fits = np.zeros((field_points+2,n_pos,n_pos))         #PSF cube for FITS , field points + open loop and diffraction
 
     #Structure Functions coordinates
-    max_struct_value = 1            #Not sure how to set this.  I think above 2 we don't care??
+    max_struct_value = diam_m            #I think we want to calculate all values seen by telescope here
     lengthperstructpix = 1 / n_struct * max_struct_value * 2
     x_s = np.arange(n_struct) + 1
     y_s = np.arange(n_struct) + 1
@@ -72,10 +72,12 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
     R_struct = np.sqrt(X_struct**2 + Y_struct**2)
 
     #Spatial Frequency coordinates
-    max_freq_value = 2            #Not sure how to set this.  I think above 2 we don't care??
+    max_freq_value = 4            #Not sure how to set this.  At 4, 4000 actuators are still well-modeled.
     lengthperfreqpix = 1 / n_ang * max_freq_value * 2
-    f_x = (x - ang_cen - 1) * lengthperfreqpix   #units of m^-1
-    f_y = (y - ang_cen - 1) * lengthperfreqpix    #units of m^-1          Put in factor of 2 on Jan. 30 after doing structure function checks 
+    tempf_x = np.arange(n_ang) + 1
+    tempf_y = np.arange(n_ang) + 1
+    f_x = (tempf_x - ang_cen - 1) * lengthperfreqpix   #units of m^-1
+    f_y = (tempf_y - ang_cen - 1) * lengthperfreqpix    #units of m^-1          Put in factor of 2 on Jan. 30 after doing structure function checks 
     f_X, f_Y = np.meshgrid(f_x, f_y)
     f_r = np.sqrt((f_X)**2 + (f_Y)**2)
     max_f = np.max(f_r) / np.sqrt(2)
@@ -176,7 +178,7 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
             for fp in range(field_points) :
                 integrand2_e[fp,:,:] = ((f_X**2 + f_Y**2) + (1/L_0**2))**(-11/6)  * G2[fp,:,:]  #second term in eq. 7
         
-        factor =  6.88 / 2  *  0.0229 * 0.423 * (2 * np.pi / wavel)**2 * J_layer      #terms outside integral for eq. 7 and eq. 6
+        factor =  6.88 / 2   *  0.0229 * 0.423 * (2 * np.pi / wavel)**2 * J_layer      #terms outside integral for eq. 7 and eq. 6
        
         '''
         #Attempt to speed up computations in nested for loops
@@ -214,8 +216,8 @@ def CalcPSF(field_size, field_points, lp, hp, L_0, elevation, wavel, num_guide_s
                 D_total_e[fp,:,:] = D_e[fp,:,:] + D_total_e[fp,:,:]
 
     # Create a finer grid
-    finer_x = np.linspace(np.min(X_struct), np.max(X_struct), n_pos)
-    finer_y = np.linspace(np.min(X_struct), np.max(X_struct), n_pos)
+    finer_x = np.linspace(np.min(X_struct), np.max(X_struct), n_ang)
+    finer_y = np.linspace(np.min(X_struct), np.max(X_struct), n_ang)
 
     # Create meshgrid for the finer grid
     finer_x_mesh, finer_y_mesh = np.meshgrid(finer_x, finer_y)
